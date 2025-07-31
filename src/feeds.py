@@ -1,6 +1,12 @@
 from dataclasses import dataclass, field
 from typing import Optional, List
 from urllib.parse import urlencode
+import requests
+from bs4 import BeautifulSoup
+from datetime import datetime
+import os
+from pathlib import Path
+import json
 
 
 @dataclass
@@ -13,7 +19,7 @@ class Feed:
     description: str = ""
     content_type: Optional[str] = None
     site: Optional[str] = None
-    max: Optional[int] = 10
+    max: Optional[int] = None
     url: str = field(init=False)
 
     def __post_init__(self):
@@ -44,7 +50,7 @@ class BaseRSS:
 
 
 @dataclass
-class RSS_DOD(BaseRSS):
+class DOD_RSS(BaseRSS):
     """
     RSS feeds for the United States Department of Defense (DOD).
     """
@@ -52,7 +58,7 @@ class RSS_DOD(BaseRSS):
             Feed(
                 name="Feature Stories",
                 content_type="800",
-                base_url= "https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?",
+                base_url= "https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx",
                 site="945",
                 max=10,
                 description="Feature stories from the Department of Defense."
@@ -60,7 +66,7 @@ class RSS_DOD(BaseRSS):
             Feed(
                 name="News",
                 content_type="1",
-                base_url="https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?",
+                base_url="https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx",
                 site="945",
                 max=10,
                 description="News from the Department of Defense."
@@ -68,7 +74,7 @@ class RSS_DOD(BaseRSS):
             Feed(
                 name="Releases",
                 content_type="9",
-                base_url="https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?",
+                base_url="https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx",
                 site="945",
                 max=10,
                 description="Press releases from the Department of Defense."
@@ -76,7 +82,7 @@ class RSS_DOD(BaseRSS):
             Feed(
                 name="Contract Announcements",
                 content_type="400",
-                base_url="https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?",
+                base_url="https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx",
                 site="945",
                 max=10,
                 description="U.S. Department of Defense Contracts valued at $7.5 million or more are announced each business day at 5 p.m."
@@ -84,8 +90,7 @@ class RSS_DOD(BaseRSS):
             Feed(
                 name="Advisories",
                 content_type="500",
-                base_url="https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?",
-                site="945",
+                base_url="https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx",
                 max=10,
                 description="Advisories from the Department of Defense."
             )
@@ -137,20 +142,6 @@ class GovInfo_RSS(BaseRSS):
 
 
 @dataclass
-class TreasuryDirect_RSS(BaseRSS):
-    """
-    RSS feeds for the U.S. Department of the Treasury's Bureau of the Fiscal Service.
-    """
-    feeds: list[Feed] = field(default_factory=lambda: [
-            Feed(
-                name="Debt To The Penny",
-                base_url="https://treasurydirect.gov/NP_WS/debt/feeds/recent",
-                description="The most recent Debt to the Penny reported values."
-            ),
-    ])
-
-
-@dataclass
 class FederalReserve_RSS(BaseRSS):
     """
     RSS feeds for the Federal Reserve Board.
@@ -167,3 +158,85 @@ class FederalReserve_RSS(BaseRSS):
             description="All press releases from the Federal Reserve Board."
         )
     ])
+
+    def fetch_fed_speech(self, url: str) -> dict:
+        """
+        Fetch an individual speech from the FRB All Speeches and Testimony feed.
+        """
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Extract title
+        title = soup.find('h3').get_text(strip=True)
+
+        # Extract speaker
+        speaker_tag = soup.find('p', class_='speaker')
+        speaker = speaker_tag.get_text(strip=True) if speaker_tag else None
+
+        # Extract date (convert to ISO format)
+        date_tag = soup.find('p', class_='article__time')
+        date_raw = date_tag.get_text(strip=True) if date_tag else None
+        date = datetime.strptime(date_raw, "%B %d, %Y").isoformat() if date_raw else None
+
+        # Extract location (found in <em> inside the first paragraph)
+        location_tag = soup.find('p', class_='location')
+        location = location_tag.get_text(strip=True) if location_tag else None
+        content_div = soup.find('div', class_='col-xs-12 col-sm-8 col-md-8')
+        if content_div:
+            first_para = content_div.find('p')
+            em = first_para.find('em') if first_para else None
+
+        # Extract full content for summarization
+        paragraphs = content_div.find_all('p') if content_div else []
+        content = "\n".join(p.get_text(strip=True) for p in paragraphs)
+
+        return {
+            "title": title,
+            "speaker": speaker,
+            "date": date,
+            "location": location,
+            "url": url,
+            "content": content  # You can optionally omit or truncate here
+        }
+
+    def append_speech_to_json(self, speech: dict, base_dir="../fed_speeches_json"):
+        """
+        Append a speech dict to a JSON file grouped by speaker.
+        Prevents duplication by comparing URLs.
+        """
+        os.makedirs(base_dir, exist_ok=True)
+
+        speaker_slug = speech['speaker'].lower().replace(" ", "_")
+        json_path = Path(base_dir) / f"{speaker_slug}.json"
+
+        # Load existing data or initialize structure
+        if json_path.exists():
+            with open(json_path, "r") as f:
+                data = json.load(f)
+        else:
+            data = {
+                "speaker": speech["speaker"],
+                "speeches": []
+            }
+
+        # Deduplication check based on URL
+        existing_urls = {entry.get("url") for entry in data.get("speeches", [])}
+        if speech.get("url") in existing_urls:
+            print(f"⚠️ Speech already exists in {json_path}. Skipping.")
+            return
+
+        cleaned_speech = {
+            "title": speech["title"],
+            "date": speech["date"],
+            "location": speech["location"],
+            "url": speech.get("url"),
+            "content": speech["content"]
+        }
+
+        data["speeches"].append(cleaned_speech)
+
+        # Save to JSON
+        with open(json_path, "w") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        print(f"✔️ Appended new speech to {json_path}")
