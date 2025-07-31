@@ -87,7 +87,6 @@ class TreasuryDirect_RSS(BaseRSS):
         with open('../debt_data_json/debt_data.json', 'r') as file:
             data = json.load(file)
 
-        # Step 1: Extract total debt for specific dates
         start_date = start_date
         end_date = end_date
 
@@ -107,7 +106,7 @@ class TreasuryDirect_RSS(BaseRSS):
                 end_intragovernmental = entry["intragovernmental"]
                 end_total_debt = entry["total_debt"]
 
-        # Step 2: Calculate the differences
+        # Calc diffs
         if start_total_debt is not None and end_total_debt is not None:
             public_debt_diff = end_public_debt - start_public_debt
             public_debt_sign = "+" if public_debt_diff >= 0 else "-"
@@ -124,7 +123,7 @@ class TreasuryDirect_RSS(BaseRSS):
             total_debt_sign = ""
             print("Error: One or both dates not found in the data.")
 
-        # Step 3: Calculate the number of days elapsed
+        # Time calcs
         start_date_obj = datetime.strptime(start_date, "%m/%d/%Y")
         end_date_obj = datetime.strptime(end_date, "%m/%d/%Y")
         days_elapsed = (end_date_obj - start_date_obj).days
@@ -132,6 +131,7 @@ class TreasuryDirect_RSS(BaseRSS):
         gmt_time = datetime.now(ZoneInfo("UTC"))
         eastern_time = datetime.now(ZoneInfo("America/New_York"))
 
+        # Output
         print("\033[H\033[J", end="")  # ANSI escape code to clear screen
         print("\n")
         print(f"  TreasuryDirect - US Debt to the Penny")

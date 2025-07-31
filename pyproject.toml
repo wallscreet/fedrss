@@ -9,6 +9,7 @@ dependencies = [
     "feedparser>=6.0.11",
     "ipykernel>=6.30.0",
     "openai>=1.97.1",
+    "playwright>=1.54.0",
     "pydantic>=2.11.7",
     "python-dotenv>=1.1.1",
     "pyyaml>=6.0.2",

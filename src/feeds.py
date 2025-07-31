@@ -49,53 +49,6 @@ class BaseRSS:
         return feed.url
 
 
-@dataclass
-class DOD_RSS(BaseRSS):
-    """
-    RSS feeds for the United States Department of Defense (DOD).
-    """
-    feeds: list[Feed] = field(default_factory=lambda: [
-            Feed(
-                name="Feature Stories",
-                content_type="800",
-                base_url= "https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx",
-                site="945",
-                max=10,
-                description="Feature stories from the Department of Defense."
-            ),
-            Feed(
-                name="News",
-                content_type="1",
-                base_url="https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx",
-                site="945",
-                max=10,
-                description="News from the Department of Defense."
-            ),
-            Feed(
-                name="Releases",
-                content_type="9",
-                base_url="https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx",
-                site="945",
-                max=10,
-                description="Press releases from the Department of Defense."
-            ),
-            Feed(
-                name="Contract Announcements",
-                content_type="400",
-                base_url="https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx",
-                site="945",
-                max=10,
-                description="U.S. Department of Defense Contracts valued at $7.5 million or more are announced each business day at 5 p.m."
-            ),
-            Feed(
-                name="Advisories",
-                content_type="500",
-                base_url="https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx",
-                max=10,
-                description="Advisories from the Department of Defense."
-            )
-    ])
-
 
 @dataclass
 class GovInfo_RSS(BaseRSS):
