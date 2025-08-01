@@ -149,7 +149,7 @@ class FederalReserve_RSS(BaseRSS):
             "date": date,
             "location": location,
             "url": url,
-            "content": content  # You can optionally omit or truncate here
+            "content": content
         }
 
     def append_speech_to_json(self, speech: dict, base_dir="../fed_speeches_json"):
